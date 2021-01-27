@@ -57,10 +57,23 @@ print(port_returns)
 port_risk <- sqrt(t(wts) %*% (cov_mat %*% wts))
 print(port_risk)
 
+## Theoretical minimum variance portfolio weights
+
+# Column vector of ones
+ones <- t(t(rep(1, length(tick))))
+
+denominator <- t(ones)%*%solve(cov_mat)%*%ones
+
+weights <- (solve(cov_mat)%*%ones)/(as.double(denominator)) 
+
+((sum(mean_ret*weights)+1)^252)-1
+
+sqrt(t(weights) %*% (cov_mat %*% weights))
+
 ## Below follows code to optimize portfolio and store values
 
 # Number of portfolios
-num_port <- 5000
+num_port <- 10000
 
 # Creating a matrix to store the weights
 
@@ -87,6 +100,7 @@ for (i in seq_along(port_returns)) {
   
   wts <- runif(length(tick))
   wts <- wts/sum(wts)
+  wts
   
   # Storing weight in the matrix
   all_wts[i,] <- wts
