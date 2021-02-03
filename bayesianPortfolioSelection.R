@@ -46,22 +46,38 @@ gamma <- 10
 
 mean_ret <- colMeans(ret_data_wide)
 
-# multiply to annualize maybe?
-cov_mat <- cov(ret_data_wide)*(nrow(ret_data_wide)-1)
+# Multiply covariance by n-1 to get the S matrix in Eq.4
+S_mat <- cov(ret_data_wide)*(nrow(ret_data_wide)-1)
 
 # Vector of ones
 ones <- t(t(rep(1, length(tick))))
 
 # Weights for global minimum variance portfolio
-wts_gmv <- (solve(cov_mat)%*%ones)/(as.double(t(ones)%*%solve(cov_mat)%*%ones)) 
+wts_gmv <- (solve(S_mat)%*%ones)/(as.double(t(ones)%*%solve(S_mat)%*%ones)) 
 
-# Q from Eq. 8 and R from Eq. 28
-Q <- solve(cov_mat) - (solve(cov_mat)%*%ones%*%t(ones)%*%solve(cov_mat))/(as.double(t(ones)%*%solve(cov_mat)%*%ones)) 
+## Algorithm 1: Simulate from posterior distribution of diffuse prior from minimum variance portfolio
+# mean and weights are column vectors
+sampleDiffuse <- function(Samples = 1000, mean, wts, S, n, k){
+  B <- Samples
+  sample_diffuse <- c()
+  
+  for(i in 1:B){
+    # Draw samples from t distribution
+    t_1 <- rt(1, n-k)
+    t_2 <- rt(1, n-k+1)
+    
+    sample_diffuse[i] <- t(wts)%*%mean + sqrt(t(wts)%*%S%*%wts)*((t_1)/sqrt(n*(n-k))+sqrt(1+(t_1^2)/(n-k))*((t_2)/sqrt(n-k+1)))
+  }
+  return(sample_diffuse)
+}
 
-
+sample_diffuse <- sampleDiffuse(Samples = 1000, mean = mean_ret, S = S_mat, wts = wts_gmv, n = n, k = k)
 
 
 ## mean variance portfolio
+# Q from Eq. 8 and R from Eq. 28
+Q <- solve(S_mat) - (solve(S_mat)%*%ones%*%t(ones)%*%solve(S_mat))/(as.double(t(ones)%*%solve(S_mat)%*%ones)) 
+
 wts_mv_diffuse <- wts_gmv + 1/(gamma*c_kn)*Q%*%mean_ret
 
 # Same as Eq. 9
@@ -71,7 +87,7 @@ R_mv_diffuse <- t(mean_ret)%*%wts_gmv + 1/(gamma*c_kn)*t(mean_ret)%*%Q%*%mean_re
 (R_mv_diffuse + 1)^252 - 1
 
 # Expected variance
-V_mv_diffuse <- c_kn/(as.double(t(ones)%*%solve(cov_mat)%*%ones)) + 1/(gamma^2*c_kn)*t(mean_ret)%*%Q%*%mean_ret
+V_mv_diffuse <- c_kn/(as.double(t(ones)%*%solve(S_mat)%*%ones)) + 1/(gamma^2*c_kn)*t(mean_ret)%*%Q%*%mean_ret
 
 # Expected annual variance
 V_mv_diffuse*252
@@ -89,7 +105,7 @@ R_gmv <- t(mean_ret)%*%wts_gmv
 (R_gmv + 1)^252 - 1
 
 # Variance of global minimum variance portfolio
-V_gmv <- c_kn/(as.double(t(ones)%*%solve(cov_mat)%*%ones)) 
+V_gmv <- c_kn/(as.double(t(ones)%*%solve(S_mat)%*%ones)) 
 
 # Left to do is create efficient frontier using Eq. 13
 
@@ -117,7 +133,7 @@ R_mv_conjugate <- t(mean_ret)%*%wts_gmv + 1/(gamma*q_kn)*t(mean_ret)%*%Q%*%mean_
 (R_mv_conjugate + 1)^252 - 1
 
 # Expected variance
-V_mv_conjugate <- q_kn/(as.double(t(ones)%*%solve(cov_mat)%*%ones)) + 1/(gamma^2*q_kn)*t(mean_ret)%*%Q%*%mean_ret
+V_mv_conjugate <- q_kn/(as.double(t(ones)%*%solve(S_mat)%*%ones)) + 1/(gamma^2*q_kn)*t(mean_ret)%*%Q%*%mean_ret
 
 # Expected annual variance
 V_mv_conjugate*252
