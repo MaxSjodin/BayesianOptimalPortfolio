@@ -17,13 +17,12 @@ stockNames <- getNames("Data/quotes.csv")
 # Doing analysis from post "https://www.codingfinance.com/post/2018-04-20-portfolio-stats/" for 
 #Select stocks to analyze
 
-tick <- stockNames[-1] %>% head(6) %>% str_sort()
-
+tick <- stockNames[-1] %>% head(8) %>% str_sort()
 
 #download price data
 price_data <- tq_get(tick,
-                     from = '2015-12-29',
-                     to = '2019-12-29',
+                     from = '2020-06-29',
+                     to = '2020-12-29',
                      get = 'stock.prices')
 
 price_data[,-c(1,2)] <- na.approx(price_data[,-c(1,2)])
@@ -73,7 +72,7 @@ sqrt(t(weights) %*% (cov_mat %*% weights))
 ## Below follows code to optimize portfolio and store values
 
 # Number of portfolios
-num_port <- 10000
+num_port <- 5000
 
 # Creating a matrix to store the weights
 
