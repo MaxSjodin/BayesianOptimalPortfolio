@@ -8,10 +8,12 @@ source("getNamesFinance.R")
 # Gathers stock data in nested list
 #source("getData.R")
 
-
+# Stocks from arbitrary "Sweden top 100" portfolio
 stockNames <- getNames("Data/quotes.csv")
+# All stocks on Swedish market
+allstockNames <- getNames("Data/stocks.csv")
 
-# Create dataframe containing adjusted price for each stock and time
+# Create data frame containing adjusted price for each stock and time
 # Maybe later
 
 # Doing analysis from post "https://www.codingfinance.com/post/2018-04-20-portfolio-stats/" for 
@@ -19,13 +21,13 @@ stockNames <- getNames("Data/quotes.csv")
 
 tick <- stockNames[-1] %>% head(8) %>% str_sort()
 
+fullNames <- get_stock_name(tick)
+
 #download price data
 price_data <- tq_get(tick,
-                     from = '2020-06-29',
+                     from = '2019-06-29',
                      to = '2020-12-29',
                      get = 'stock.prices')
-
-price_data[,-c(1,2)] <- na.approx(price_data[,-c(1,2)])
 
 
 # Calculate daily returns for assets
@@ -35,10 +37,16 @@ ret_data <- price_data %>%
                            mutate_fun = periodReturn,
                            period = "daily",
                            col_rename = "ret")
+
 # Wide format
 ret_data_wide <- ret_data %>%
                   spread(symbol, value = ret) %>%
                   tk_xts()
+
+# Approximate missing values 
+# Should not affect daily data but in case of weekly/monthly data the NA approx 
+# should be done before gathering to get weekly/monthly
+ret_data_wide <- na.approx(ret_data_wide)
 
 #Test one portfolio to look for errors
 #################

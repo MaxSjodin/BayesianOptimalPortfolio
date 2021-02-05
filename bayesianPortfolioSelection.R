@@ -8,17 +8,28 @@ source("getNamesFinance.R")
 #source("getData.R")
 
 
-stockNames <- getNames("Data/quotes.csv")
 
-tick <- stockNames[-1] %>% head(29) %>% str_sort()
+# Stocks from arbitrary "Sweden top 100" portfolio
+stockNames <- getNames("Data/quotes.csv")
+# All stocks on Swedish market
+allstockNames <- getNames("Data/stocks.csv")
+
+# Create data frame containing adjusted price for each stock and time
+# Maybe later
+
+# Doing analysis from post "https://www.codingfinance.com/post/2018-04-20-portfolio-stats/" for 
+#Select stocks to analyze
+
+tick <- stockNames[-1] %>% head(8) %>% str_sort()
+
+fullNames <- get_stock_name(tick)
 
 #download price data
 price_data <- tq_get(tick,
-                     from = '2020-05-28',
+                     from = '2019-06-29',
                      to = '2020-12-29',
                      get = 'stock.prices')
 
-price_data[,-c(1,2)] <- na.approx(price_data[,-c(1,2)])
 
 # Calculate daily returns for assets
 ret_data <- price_data %>%
@@ -33,6 +44,11 @@ ret_data_wide <- ret_data %>%
   spread(symbol, value = ret) %>%
   tk_xts()
 
+# Approximate missing values 
+# Should not affect daily data but in case of weekly/monthly data the NA approx 
+# should be done before gathering to get weekly/monthly
+ret_data_wide <- na.approx(ret_data_wide)
+
 # From the wide format we can perhaps select columns and rewrite the rest of the code as function
 
 ### Diffuse prior
@@ -42,7 +58,7 @@ n <- nrow(ret_data_wide)
 k <- ncol(ret_data_wide)
 c_kn <- 1/(n-k-1)+(2*n-k-1)/(n*(n-k-1)*(n-k-2))
 # Arbitrary value for gamma
-gamma <- 10
+gamma <- 50
 
 mean_ret <- colMeans(ret_data_wide)
 
@@ -57,7 +73,7 @@ wts_gmv <- (solve(S_mat)%*%ones)/(as.double(t(ones)%*%solve(S_mat)%*%ones))
 
 ## Algorithm 1: Simulate from posterior distribution of diffuse prior from minimum variance portfolio
 # mean and weights are column vectors
-sampleDiffuse <- function(Samples = 1000, mean, wts, S, n, k){
+sampleDiffuse <- function(Samples = 10000, mean, wts, S, n, k){
   B <- Samples
   sample_diffuse <- c()
   
@@ -71,8 +87,11 @@ sampleDiffuse <- function(Samples = 1000, mean, wts, S, n, k){
   return(sample_diffuse)
 }
 
-sample_diffuse <- sampleDiffuse(Samples = 1000, mean = mean_ret, S = S_mat, wts = wts_gmv, n = n, k = k)
+sample_diffuse <- sampleDiffuse(Samples = 10000, mean = mean_ret, S = S_mat, wts = wts_gmv, n = n, k = k)
 
+# Does not seem to be correct, compared to Table1 and 2 in article
+mad(sample_diffuse)
+var(sample_diffuse)
 
 ## mean variance portfolio
 # Q from Eq. 8 and R from Eq. 28
