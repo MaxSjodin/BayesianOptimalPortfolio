@@ -25,8 +25,8 @@ fullNames <- get_stock_name(tick)
 
 #download price data
 price_data <- tq_get(tick,
-                     from = '2019-06-29',
-                     to = '2020-12-29',
+                     from = '2021-01-01',
+                     to = '2021-03-01',
                      get = 'stock.prices')
 
 
