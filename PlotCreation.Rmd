@@ -1,0 +1,147 @@
+---
+title: "PlotCreation"
+author: "Max Sjödin"
+date: '2021-03-24'
+output: pdf_document
+header-includes:
+  - \usepackage{booktabs}
+---
+
+```{r}
+library(MASS)
+set.seed(999)
+B<-10^4
+r_0<-100
+d_0<-100
+gam<-50
+igam<-1/gam
+
+k_set<-c(5,10,25,40)
+n_set<-c(50,75,100,130)
+
+D_R_B<-matrix(0,4,4)
+D_R_BI<-matrix(0,4,4)
+D_R_S<-matrix(0,4,4)
+D_V_B<-matrix(0,4,4)
+D_V_BI<-matrix(0,4,4)
+D_V_S<-matrix(0,4,4)
+
+for (i in 1:4)
+{
+k<-k_set[i]
+for (j in 1:4)
+{n<-n_set[j]
+d_n<-1/(n-1)
+c_kn<-1/(n-k-1)+(2*n-k-1)/(n*(n-k-1)*(n-k-2))
+q_kn<-1/(n+d_0-2*k-1)+(2*n+r_0+d_0-2*k-1)/((n+r_0)*(n+d_0-2*k-1)*(n+d_0-2*k-2))
+
+bi_n<-matrix(1,n,1)
+bi_k<-matrix(1,k,1)
+G<-diag(n)-matrix(1,n,n)/n
+J_k<-matrix(1,k,k)
+
+R_P<-matrix(0,B,1)
+V_P<-matrix(0,B,1)
+R_S<-matrix(0,B,1)
+V_S<-matrix(0,B,1)
+R_B<-matrix(0,B,1)
+V_B<-matrix(0,B,1)
+R_BI<-matrix(0,B,1)
+V_BI<-matrix(0,B,1)
+
+for (b in 1:B)
+{
+##############mu and Sigma
+mu<-runif(k,-0.01,0.01)
+u<-runif(k,0.002,0.005)
+rho<-0.6
+R<-(1-rho)*diag(k)+rho*J_k
+
+Sig<-diag(u)%*%R%*%diag(u)
+iSig<-solve(Sig)
+tSig<-t(chol(Sig))
+Q_P<-iSig-iSig%*%J_k%*%iSig/sum(t(bi_k)%*%iSig%*%bi_k)
+s_P<-t(mu)%*%Q_P%*%mu
+
+R_P[b]<- (t(mu)%*%iSig%*%bi_k)/(t(bi_k)%*%iSig%*%bi_k)+igam*s_P
+V_P[b]<- 1/(t(bi_k)%*%iSig%*%bi_k)+(igam^2)*s_P 
+
+########################hyperparameters
+eps<-0.01
+m0<-mu+eps*runif(k,-0.01,0.01)
+del<-0.5
+S0<-Sig+del*diag(runif(k,0.002,0.005)^2)
+
+###########data
+x<-matrix(rep(mu,n),c(k,n))+tSig%*%matrix(rnorm(k*n),c(k,n))
+x_data<-x
+
+bar_x<-x_data%*%bi_n/n
+bar_xI<-(n*bar_x+r_0*m0)/(n+r_0)
+S<-x_data%*%G%*%t(x_data)
+iS<-solve(S)
+iSI<-solve(S+S0+n*r_0*(m0-bar_x)%*%t(m0-bar_x)/(n+r_0))
+
+Q_S<-iS-iS%*%J_k%*%iS/sum(t(bi_k)%*%iS%*%bi_k)
+s_S<-t(bar_x)%*%Q_S%*%bar_x
+Q_SI<-iSI-iSI%*%J_k%*%iSI/sum(t(bi_k)%*%iSI%*%bi_k)
+s_SI<-t(bar_xI)%*%Q_SI%*%bar_xI
+
+R_S[b]<- (t(bar_x)%*%iS%*%bi_k)/(t(bi_k)%*%iS%*%bi_k)+igam*s_S/d_n
+V_S[b]<- d_n/(t(bi_k)%*%iS%*%bi_k)+(igam^2)*s_S/d_n
+
+R_B[b]<- (t(bar_x)%*%iS%*%bi_k)/(t(bi_k)%*%iS%*%bi_k)+igam*s_S/c_kn
+V_B[b]<- c_kn/(t(bi_k)%*%iS%*%bi_k)+(igam^2)*s_S/c_kn
+
+R_BI[b]<- (t(bar_xI)%*%iSI%*%bi_k)/(t(bi_k)%*%iSI%*%bi_k)+igam*s_SI/q_kn
+V_BI[b]<- q_kn/(t(bi_k)%*%iSI%*%bi_k)+(igam^2)*s_SI/q_kn
+}
+
+D_R_S[i,j]<-mean(abs(R_S-R_P))
+D_V_S[i,j]<-mean(abs(V_S-V_P))
+D_R_B[i,j]<-mean(abs(R_B-R_P))
+D_V_B[i,j]<-mean(abs(V_B-V_P))
+D_R_BI[i,j]<-mean(abs(R_BI-R_P))
+D_V_BI[i,j]<-mean(abs(V_BI-V_P))
+}
+}
+
+R_tab<-NULL
+for (i in 1:4)
+{
+  R_tab<-rbind(R_tab,D_R_B[i,],D_R_BI[i,],D_R_S[i,])  
+}
+
+V_tab<-NULL
+for (i in 1:4)
+{
+  V_tab<-rbind(V_tab,D_V_B[i,],D_V_BI[i,],D_V_S[i,])  
+}
+
+RV_tab <- cbind(R_tab,V_tab)
+
+```
+
+```{r}
+### Create table
+library(kableExtra)
+
+RV_tab_style <- cbind(V0 = c(rep("k = 5",3), rep("k = 10",3), rep("k = 25",3), rep("k = 40",3)), 
+                      V01= c(rep(c("Sample", "Diffuse", "Conjugate"),4)), RV_tab)
+
+RV_tab_style[2,-(1:2)] <- RV_tab_style[2,-(1:2)]%>% cell_spec("latex",bold = T)
+RV_tab_style[5,-(1:2)] <- RV_tab_style[5,-(1:2)]%>% cell_spec("latex",bold = T)
+RV_tab_style[8,-(1:2)] <- RV_tab_style[8,-(1:2)]%>% cell_spec("latex",bold = T)
+RV_tab_style[11,-(1:2)] <- RV_tab_style[11,-(1:2)]%>% cell_spec("latex",bold = T)
+
+knitr::kable(RV_tab_style, format="latex", booktabs=T, col.names=NULL, digits=4, escape=F) %>%
+  kable_styling(latex_options = "striped") %>%
+  column_spec(1, bold=T) %>%
+  collapse_rows(columns = 1, latex_hline = "major", valign = "middle") %>% 
+  add_header_above(c("", "", "n = 50", "n = 75", "n = 100", "n = 130", "n = 50", "n = 75", "n = 100", "n = 130")) %>%
+  add_header_above(c("", "", "AD of portfolio expected return" = 4, 
+                     "AD of portfolio variance" = 4), bold = T, italic = T)
+  
+dd_header_above(c("Mean" = 4, "Variance" = 4), bold = T, italic = T) 
+
+```

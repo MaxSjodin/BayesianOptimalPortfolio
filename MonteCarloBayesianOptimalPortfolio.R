@@ -3,7 +3,7 @@ library(dplyr)
 library(MASS)
 library(MCMCpack)
 
-meanVarianceWeights <- function(B = 10000, k = 40, n = 50, alpha = 50, meanlow = -0.01, meanhigh = 0.01, 
+meanVarianceWeights <- function(B = 1000, k = 40, n = 50, alpha = 50, meanlow = -0.01, meanhigh = 0.01, 
                        volatilitylow = 0.002, volatilityhigh = 0.005, corr = 0.6,
                        r_0 = 100, d_0 = 100){
 
@@ -78,6 +78,10 @@ meanVarianceWeights <- function(B = 10000, k = 40, n = 50, alpha = 50, meanlow =
 
     S_mat_c <- S_mat_2+S_0+n*r_0*(m_0-mean_ret_c)%*%t(m_0-mean_ret_c)/(n+r_0)
     
+    ##############Based on same sample as freq
+    mean_ret_c <- (n*mean_ret+r_0*m_0)/(n+r_0)
+    S_mat_c <- S_mat+S_0+n*r_0*(m_0-mean_ret_c)%*%t(m_0-mean_ret_c)/(n+r_0)
+    ################
     q_kn <- 1/(n+d_0-2*k-1) + (2*n+r_0+d_0-2*k-1)/((n+r_0)*(n+d_0-2*k-1)*(n+d_0-2*k-2))
     
     Q_c <- solve(S_mat_c) - (solve(S_mat_c)%*%ones%*%t(ones)%*%solve(S_mat_c))/(as.double(t(ones)%*%solve(S_mat_c)%*%ones)) 
@@ -120,119 +124,41 @@ meanVarianceWeights <- function(B = 10000, k = 40, n = 50, alpha = 50, meanlow =
   return(df)
 }
 
-#Q and Q_true still differ
+# Look at mean for each expected return/variance
+data <- meanVarianceWeights() %>% colMeans()
+data
 
-deviations <- function(B = 10000, k = 40, n = 50, alpha = 50, meanlow = -0.01, meanhigh = 0.01, 
-                        volatilitylow = 0.002, volatilityhigh = 0.005, corr = 0.6,
-                        r_0 = 100, d_0 = 100){
-  
+# function that fills matrix with values, similar to that of 
+# table 1 in "Bayesian mean-variance... under parameter uncertainty"
+deviations <- function(k_vec = c(5, 10, 25, 40), n_vec = c(50, 75, 100, 125), df_length = 8){
+  n_dev <-df_length/2-1 # number of priors to compute deviations for
+  m_ret_dev <- matrix(0, nrow = length(k_vec)*n_dev, ncol = length(n_vec)) 
+  m_var_dev <- matrix(0, nrow = length(k_vec)*n_dev, ncol = length(n_vec))
+  for (j in 1:length(k_vec)) {
+    for (i in 1:length(n_vec)) {
+      temp <- meanVarianceWeights(k=k_vec[j],n=n_vec[i]) %>% colMeans()
+      
+      ret_deviations <- c(abs(temp[1]-temp[3]), abs(temp[1]-temp[5]), abs(temp[1]-temp[7]))
+      var_deviations <- c(abs(temp[2]-temp[4]), abs(temp[2]-temp[6]), abs(temp[2]-temp[8]))
+      
+      m_ret_dev[(j*n_dev-2):(j*n_dev),i] <- ret_deviations
+      m_var_dev[(j*n_dev-2):(j*n_dev),i] <- var_deviations
+    }
+  }  
+  return(list(ret = m_ret_dev, var = m_var_dev))
 }
-#FUNKAR!!!
-data <- meanVarianceWeights(B=100000, k=5, n = 50) %>% colMeans()
+
+data <- deviations(k_vec = c(5, 10, 25, 40), n_vec = c(50, 75, 100, 125))
 data
-
-ret_deviations <- c(abs(data[1]-data[3]), abs(data[1]-data[5]), abs(data[1]-data[7]))
-var_deviations <- c(abs(data[2]-data[4]), abs(data[2]-data[6]), abs(data[2]-data[8]))
-
-data2 <- meanVarianceWeights(B=10000, k=10, n = 50) %>% colMeans()
-data2
-
-ret_deviations2 <- c(abs(data2[1]-data2[3]), abs(data2[1]-data2[5]), abs(data2[1]-data2[7]))
-var_deviations2 <- c(abs(data2[2]-data2[4]), abs(data2[2]-data2[6]), abs(data2[2]-data2[8]))
-
-data3 <- meanVarianceWeights(B=10000, k=25, n = 50) %>% colMeans()
-data3
-
-ret_deviations3 <- c(abs(data3[1]-data3[3]), abs(data3[1]-data3[5]), abs(data3[1]-data3[7]))
-var_deviations3 <- c(abs(data3[2]-data3[4]), abs(data3[2]-data3[6]), abs(data3[2]-data3[8]))
-
-data4 <- meanVarianceWeights(B=10000, k=40, n = 50) %>% colMeans()
-data4
-
-ret_deviations4 <- c(abs(data4[1]-data4[3]), abs(data4[1]-data4[5]), abs(data4[1]-data4[7]))
-var_deviations4 <- c(abs(data4[2]-data4[4]), abs(data4[2]-data4[6]), abs(data4[2]-data4[8]))
-
-deviations <- rbind(ret_deviations, ret_deviations2, ret_deviations3, ret_deviations4)
-deviations
-
-data <- meanVarianceWeights(B=10000, k=5, n = 75) %>% colMeans()
-data
-
-ret_deviations <- c(abs(data[1]-data[3]), abs(data[1]-data[5]), abs(data[1]-data[7]))
-var_deviations <- c(abs(data[2]-data[4]), abs(data[2]-data[6]), abs(data[2]-data[8]))
-
-data2 <- meanVarianceWeights(B=10000, k=10, n = 75) %>% colMeans()
-
-ret_deviations2 <- c(abs(data2[1]-data2[3]), abs(data2[1]-data2[5]), abs(data2[1]-data2[7]))
-var_deviations2 <- c(abs(data2[2]-data2[4]), abs(data2[2]-data2[6]), abs(data2[2]-data2[8]))
-
-data3 <- meanVarianceWeights(B=10000, k=25, n = 75) %>% colMeans()
-
-ret_deviations3 <- c(abs(data3[1]-data3[3]), abs(data3[1]-data3[5]), abs(data3[1]-data3[7]))
-var_deviations3 <- c(abs(data3[2]-data3[4]), abs(data3[2]-data3[6]), abs(data3[2]-data3[8]))
-
-data4 <- meanVarianceWeights(B=10000, k=40, n = 75) %>% colMeans()
-
-ret_deviations4 <- c(abs(data4[1]-data4[3]), abs(data4[1]-data4[5]), abs(data4[1]-data4[7]))
-var_deviations4 <- c(abs(data4[2]-data4[4]), abs(data4[2]-data4[6]), abs(data4[2]-data4[8]))
-
-deviations2 <- rbind(ret_deviations, ret_deviations2, ret_deviations3, ret_deviations4)
-deviations2
-
-data <- meanVarianceWeights(B=10000, k=5, n = 100) %>% colMeans()
-
-ret_deviations <- c(abs(data[1]-data[3]), abs(data[1]-data[5]), abs(data[1]-data[7]))
-var_deviations <- c(abs(data[2]-data[4]), abs(data[2]-data[6]), abs(data[2]-data[8]))
-
-data2 <- meanVarianceWeights(B=10000, k=10, n = 100) %>% colMeans()
-
-ret_deviations2 <- c(abs(data2[1]-data2[3]), abs(data2[1]-data2[5]), abs(data2[1]-data2[7]))
-var_deviations2 <- c(abs(data2[2]-data2[4]), abs(data2[2]-data2[6]), abs(data2[2]-data2[8]))
-
-data3 <- meanVarianceWeights(B=10000, k=25, n = 100) %>% colMeans()
-
-ret_deviations3 <- c(abs(data3[1]-data3[3]), abs(data3[1]-data3[5]), abs(data3[1]-data3[7]))
-var_deviations3 <- c(abs(data3[2]-data3[4]), abs(data3[2]-data3[6]), abs(data3[2]-data3[8]))
-
-data4 <- meanVarianceWeights(B=10000, k=40, n = 100) %>% colMeans()
-
-ret_deviations4 <- c(abs(data4[1]-data4[3]), abs(data4[1]-data4[5]), abs(data4[1]-data4[7]))
-var_deviations4 <- c(abs(data4[2]-data4[4]), abs(data4[2]-data4[6]), abs(data4[2]-data4[8]))
-
-deviations3 <- rbind(ret_deviations, ret_deviations2, ret_deviations3, ret_deviations4)
-deviations3
-
-data <- meanVarianceWeights(B=10000, k=5, n = 130) %>% colMeans()
-
-ret_deviations <- c(abs(data[1]-data[3]), abs(data[1]-data[5]), abs(data[1]-data[7]))
-var_deviations <- c(abs(data[2]-data[4]), abs(data[2]-data[6]), abs(data[2]-data[8]))
-
-data2 <- meanVarianceWeights(B=10000, k=10, n = 130) %>% colMeans()
-
-ret_deviations2 <- c(abs(data2[1]-data2[3]), abs(data2[1]-data2[5]), abs(data2[1]-data2[7]))
-var_deviations2 <- c(abs(data2[2]-data2[4]), abs(data2[2]-data2[6]), abs(data2[2]-data2[8]))
-
-data3 <- meanVarianceWeights(B=10000, k=25, n = 130) %>% colMeans()
-
-ret_deviations3 <- c(abs(data3[1]-data3[3]), abs(data3[1]-data3[5]), abs(data3[1]-data3[7]))
-var_deviations3 <- c(abs(data3[2]-data3[4]), abs(data3[2]-data3[6]), abs(data3[2]-data3[8]))
-
-data4 <- meanVarianceWeights(B=10000, k=40, n = 130) %>% colMeans()
-
-ret_deviations4 <- c(abs(data4[1]-data4[3]), abs(data4[1]-data4[5]), abs(data4[1]-data4[7]))
-var_deviations4 <- c(abs(data4[2]-data4[4]), abs(data4[2]-data4[6]), abs(data4[2]-data4[8]))
-
-deviations4 <- rbind(ret_deviations, ret_deviations2, ret_deviations3, ret_deviations4)
-deviations4
-
 
 
 cdratio <- function(k=5,n=50){
   c_kn <- 1/(n-k-1)+(2*n-k-1)/(n*(n-k-1)*(n-k-2))
   d_n <- 1/(n-1)
-  return(c_kn/d_n)
+  q_kn <- 1/(n+100-2*k-1) + (2*n+100+100-2*k-1)/((n+100)*(n+100-2*k-1)*(n+100-2*k-2))
+  return(c(c_kn,q_kn))
 }
-
+cdratio(k=40,n=50)
 
 
 
